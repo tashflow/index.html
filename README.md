@@ -1,4 +1,4 @@
-# Stak Suite
+# index.html
 
 Single-file web app: **StockStak** (inventory & POS) + **SweetStak** (pastry orders).
 
