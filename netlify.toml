@@ -1,0 +1,15 @@
+# Netlify settings for Stak Suite
+[build]
+  publish = "."
+  # No build command — static HTML only
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
