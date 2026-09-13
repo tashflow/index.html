@@ -1,8 +1,163 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ============================================================
+    // StakSuite FINAL Firestore Security Rules — Phase 3.2
+    // Based on completed stak_meta schema discovery (no invented paths).
+    //
+    // Authorization chain:
+    //   request.auth.uid
+    //     → stak_memberships/{uid}
+    //     → apps.{app}.companyId + active
+    //     → document path / meta docId
+    //     → ALLOW / DENY
+    //
+    // DEPLOY: firebase deploy --only firestore:rules
+    // This file is NOT deployed by the HTML application.
+    // ============================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function authUid() {
+      return request.auth.uid;
+    }
+
+    function membershipPath() {
+      return /databases/$(database)/documents/stak_memberships/$(authUid());
+    }
+
+    function hasMembership() {
+      return signedIn() && exists(membershipPath());
+    }
+
+    function membership() {
+      return get(membershipPath()).data;
+    }
+
+    function hasApp(appId) {
+      return hasMembership()
+        && membership().keys().hasAny(['apps'])
+        && appId in membership().apps;
+    }
+
+    function appMember(appId) {
+      return membership().apps[appId];
+    }
+
+    function isActiveMemberOf(companyId, appId) {
+      return hasApp(appId)
+        && appMember(appId).companyId == companyId
+        && appMember(appId).active != false;
+    }
+
+    function isSupervisorOf(companyId, appId) {
+      return isActiveMemberOf(companyId, appId)
+        && appMember(appId).role == 'supervisor';
+    }
+
+    // ---- Fixed prefixes discovered in app code ----
+    // users_stockstak_  (16 chars) + companyId
+    // users_sweetstak_  (15 chars) + companyId
+    // companyId may contain underscores — always strip fixed prefix, never split on last "_".
+
+    function isUsersStockstakMeta(docId) {
+      return docId.matches('users_stockstak_.+');
+    }
+
+    function isUsersSweetstakMeta(docId) {
+      return docId.matches('users_sweetstak_.+');
+    }
+
+    function companyFromUsersStockstak(docId) {
+      // split on exact discovered prefix; remainder is companyId
+      return docId.split('users_stockstak_')[1];
+    }
+
+    function companyFromUsersSweetstak(docId) {
+      return docId.split('users_sweetstak_')[1];
+    }
+
+    function canAccessUsersStockstakMeta(docId) {
+      return isUsersStockstakMeta(docId)
+        && isActiveMemberOf(companyFromUsersStockstak(docId), 'stockstak');
+    }
+
+    function canAccessUsersSweetstakMeta(docId) {
+      return isUsersSweetstakMeta(docId)
+        && isActiveMemberOf(companyFromUsersSweetstak(docId), 'sweetstak');
+    }
+
+    // ============================================================
+    // MEMBERSHIP — client self-authorization is IMPOSSIBLE
+    // Provision only via Admin SDK / trusted backend / Console.
+    // ============================================================
+    match /stak_memberships/{memberUid} {
+      allow read: if signedIn() && authUid() == memberUid;
+
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // COMPANY BUSINESS DATA
+    // Path used by both apps: stak_companies/{companyId}/{app}/{docId}
+    // app is "stockstak" or "sweetstak"
+    // Opaque value payloads — ownership is path-based only.
+    // ============================================================
+    match /stak_companies/{companyId}/{app}/{docId} {
+      allow read: if isActiveMemberOf(companyId, app);
+      allow create, update: if isActiveMemberOf(companyId, app);
+      allow delete: if isSupervisorOf(companyId, app);
+    }
+
+    // Company root — no client writes
+    match /stak_companies/{companyId} {
+      allow read: if signedIn()
+        && (
+          isActiveMemberOf(companyId, 'stockstak')
+          || isActiveMemberOf(companyId, 'sweetstak')
+        );
+      allow write: if false;
+    }
+
+    // ============================================================
+    // stak_meta — ONLY discovered patterns
+    //
+    // Discovered writes:
+    //   users_stockstak_{companyId}  (saveUsers / StockStak)
+    //   users_sweetstak_{companyId}  (saveUsers / SweetStak)
+    //   portals_stockstak            (global portal list)
+    //   portals_sweetstak            (global portal list)
+    //   last_write                   (debug / force-write test)
+    //
+    // No client reads of stak_meta were found.
+    // Opaque `value` is NEVER used for authorization.
+    // Unknown docIds: DENY (fail closed).
+    // ============================================================
+    match /stak_meta/{docId} {
+
+      // Company-scoped user mirrors
+      allow read, create, update: if canAccessUsersStockstakMeta(docId)
+        || canAccessUsersSweetstakMeta(docId);
+
+      // Global / unscoped discovered docs — FAIL CLOSED for client writes.
+      // Ownership cannot be proven from path alone for portals_* or last_write.
+      allow read: if false;
+      allow create, update: if false;
+
+      // Deletes never used by the application
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // DEFAULT DENY
+    // ============================================================
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
