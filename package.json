@@ -1,0 +1,17 @@
+{
+  "name": "stak-suite-functions",
+  "description": "StakSuite trusted membership Cloud Functions for project stak-suite",
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/membership.test.js",
+    "lint": "node --check index.js && node --check test/membership.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^4.9.0"
+  },
+  "private": true
+}
