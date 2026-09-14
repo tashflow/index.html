@@ -1,32 +1,36 @@
-# Stak Suite
+# StakSuite
 
-**StockStak** (inventory & POS) + **SweetStak** (pastry orders) — one static website.
+Single-page suite: **StockStak** (inventory/POS) + **SweetStak**.
 
 ## Files
-| File | Purpose |
-|------|---------|
-| `index.html` | Full app (open this / host this) |
-| `netlify.toml` | Netlify publish settings |
-| `README.md` | This file |
 
-## Option A — GitHub Pages
-1. Push this folder to a GitHub repo.
-2. **Settings → Pages → Deploy from branch** → `main` → `/ (root)`.
-3. Open `https://YOUR_USERNAME.github.io/REPO_NAME/`
+| File | Description |
+|------|-------------|
+| `StakSuite.html` | Main application (full) |
+| `StakSuite-2.html` | Same build (alias) |
+| `StakSuite-clean.html` | Same build (clean local accounts/portals wipe on first open) |
+| `firestore.rules` | Fail-closed Firestore Security Rules (candidate — deploy separately) |
+| `docs/MEMBERSHIP_PROVISIONING.md` | Admin membership provisioning notes |
+| `rules-tests/` | Optional emulator rules tests |
 
-## Option B — Netlify (from GitHub)
-1. Push this folder to GitHub.
-2. [Netlify](https://app.netlify.com) → **Add new site → Import an existing project**.
-3. Connect GitHub → select this repo.
-4. Build settings: leave **build command empty**, publish directory `.` (or auto from `netlify.toml`).
-5. Deploy — you get a URL like `https://something.netlify.app`.
+## Local data wipe (this build)
 
-## Updating the site
-1. Replace `index.html` with the new version.
-2. Commit & push to GitHub.
-3. GitHub Pages / Netlify redeploy automatically.
-4. **Data is safe**: localStorage (per browser) + Firebase (`stak-suite`) are not wiped by a deploy.
+On first load, local company portals and accounts are wiped once (`stak_wipe_accounts_portals_v20260914`).
 
-## Firebase
-Config is embedded for project `stak-suite`. Enable **Firestore** in Firebase Console for cloud sync.
-Use the **Cloud** button in StockStak / SweetStak.
+This does **not** delete Firebase Auth users or Firestore `stak_memberships` / `stak_companies`.
+
+## Deploy rules (operator machine)
+
+```bash
+firebase login
+firebase use <your-project>
+firebase deploy --only firestore:rules
+```
+
+## Security notes
+
+- Do not put Admin SDK private keys in this repo.
+- Membership is Admin-provisioned only; clients cannot create `stak_memberships`.
+- Firebase web API keys in the app are client config, not service-account secrets.
+
+Generated: 2026-09-13 22:02 UTC
